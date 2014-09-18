@@ -1,0 +1,90 @@
+---
+title: "Practical Machine Learning - Project Writeup"
+author: "Aleksandar Nedeljkovic"
+date: "Thursday, September 18, 2014"
+output: html_document
+---
+
+Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible 
+to collect a large amount of data about personal activity relatively 
+inexpensively. These type of devices are part of the quantified self movement - 
+a group of enthusiasts who take measurements about themselves regularly to 
+improve their health, to find patterns in their behavior, or because they are 
+tech geeks. One thing that people regularly do is quantify how much of a 
+particular activity they do, but they rarely quantify how well they do it. In 
+this project, your goal will be to use data from accelerometers on the belt, 
+forearm, arm, and dumbell of 6 participants.They were asked to perform barbell 
+lifts correctly and incorrectly in 5 different ways. More information is
+available from the website here: 
+This is [http://groupware.les.inf.puc-rio.br/har](http://groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset). 
+
+
+```{r results='hide'}
+library(caret)
+library(foreach)
+set.seed(115)
+options(warn=-1)
+```
+
+
+First the data was loaded. Some varibables contained "#DIV/0!"; they were replaced
+by NA's
+```{r cache=TRUE}
+trainData <- read.csv("data/pml-training.csv", na.strings=c("#DIV/0!", ""))
+evalData <- read.csv("data/pml-testing.csv", na.strings=c("#DIV/0!", ""))
+```
+
+### Preprocessing
+Varaibles in columns 1-7 were omited because they were not needed.
+```{r}
+trainDataSub <- trainData[, -(1:7)]
+```
+
+All variables were changed to numeric
+```{r}
+for(i in c(1:(ncol(trainDataSub)-1))) {
+
+        trainDataSub[,i] = as.numeric(as.character(trainDataSub[,i]))
+        
+        }
+```
+
+Some collumns were empty, so they were removed:
+```{r}
+modData <- trainDataSub[colSums(is.na(trainDataSub)) == 0]
+dim(modData)
+```
+
+### Modeling
+
+Data partitioning.
+```{r}
+train <- createDataPartition(modData$classe, p=.70, list=FALSE)
+trainModData <- modData[train, ]
+testModData <- modData[-train, ]
+```
+
+Random forest was used for prediction. Parallel processing was used for speed up.   
+```{r cache=TRUE, results='hide'}
+rf.fit <- train(y=trainModData$classe, x=trainModData[ , 1:52],
+                tuneGrid=data.frame(mtry=3), 
+                trControl=trainControl(method="none"), method="parRF")  
+```
+
+
+Error reports for both training and test data.
+```{r}
+predTrain <- predict(rf.fit, newdata=trainModData)
+confusionMatrix(predTrain, trainModData$classe)
+
+predTest <- predict(rf.fit, newdata=testModData)
+confusionMatrix(predTest,testModData$classe)
+```
+
+
+Conclusion
+----------
+It can be seen from the confusion matrices that this model is very accurate. This was confirmed with evaluation data set. When this algorithm was applied to the 20 test cases all of them were correct.
+
